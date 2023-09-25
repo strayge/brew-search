@@ -1,0 +1,99 @@
+name: ci
+
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  linters:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    steps:
+      - uses: actions/checkout@v3
+      - name: python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: dependencies
+        run: pip install pip-tools && pip-compile --extra dev && pip-sync
+      - run: flake8 .
+      - run: mypy .
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: dependencies
+        run: pip install build
+      - name: build
+        run: python -m build
+      - uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: dist
+          retention-days: 1
+
+  actual_run:
+    needs:
+      - linters
+      - build
+    runs-on: macos-latest
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: dist
+          path: dist
+      - name: python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: install package
+        run: pip install dist/*.whl
+      - run: brew-search video | grep ffmpeg
+
+  release:
+    needs:
+      - linters
+      - build
+      - actual_run
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: dist
+          path: dist
+      - name: python 3.11
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: check package versions
+        id: check_package_versions
+        run: |
+          NEW_VERSION=`python3 -c "import brew_search; print(brew_search.__version__)"`
+          PIP_OUTPUT=`pip index versions brew-search 2>&1 | grep -vF WARNING | head -n 1`
+          export PIP_OUTPUT
+          OLD_VERSION=`python3 -c 'import os; out = os.environ["PIP_OUTPUT"]; import re; m = re.findall("\(.*\)$", out) or ["()"]; print(m[0][1:-1])'`
+          if [ "$NEW_VERSION" = "$OLD_VERSION" ]; then
+            echo "Version $NEW_VERSION already exists"
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "Version $NEW_VERSION does not exist (old version: $OLD_VERSION)"
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: upload
+        if: steps.check_package_versions.outputs.new == 'true' && github.ref == 'refs/heads/main'
+        uses: pypa/gh-action-pypi-publish@release/v1.8
+      - name: test upload
+        if: steps.check_package_versions.outputs.new == 'true' && github.ref == 'refs/heads/dev'
+        uses: pypa/gh-action-pypi-publish@release/v1.8
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          skip-existing: true

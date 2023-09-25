@@ -1,0 +1,104 @@
+[project]
+name = "brew-search"
+dynamic = ["version"]
+description = "Search CLI tool for Homebrew (support sorting by popularity)"
+readme = "README.md"
+license = {text = "MIT"}
+urls.repository = "https://github.com/strayge/pybrew"
+authors = [
+    {name = "strayge", email = "strayge@gmail.com"},
+]
+classifiers = [
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "Natural Language :: English",
+        "Environment :: Console",
+        "License :: OSI Approved :: MIT License",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: Implementation :: CPython",
+        "Topic :: Utilities",
+]
+requires-python = ">=3.10"
+
+dependencies = [
+    "httpx",
+    "colorama",
+]
+optional-dependencies.dev = [
+    "flake8-pyproject",
+    "flake8-commas",
+    "flake8-isort",
+    "flake8-bugbear",
+    "flake8-simplify",
+    "flake8-print",
+    "flake8-debugger",
+    "flake8-fixme",
+    "flake8-leading-blank-lines",
+    "isort",
+    "mypy",
+]
+
+[project.scripts]
+brew-search = "brew_search.__main__:cli"
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
+
+[tool.pdm.version]
+source = "file"
+path = "brew_search/__init__.py"
+
+[tool.flake8]
+exclude = [
+    ".git",
+    ".idea",
+    "__pycache__",
+    "venv",
+]
+max-line-length = 100
+ignore = [
+    # trailing comma prohibited, like (x, y,)
+    "C819",
+    # line break before binary operator
+    "W503",
+    # enumerate instead of +=1 in for (not count for var increment at other places)
+    "SIM113",
+    # nested if's instead of single complex if (sometimes it increase readability)
+    "SIM102",
+    # error handle should be first to prevent another nested (too many false positives)
+    "SIM106",
+    # dataclasses instead of simple classes (too broad reports)
+    "SIM119",
+    # combine if's branches with same body (false positive, sometimes decrease readability)
+    "SIM114",
+    # use any(...), all(...) instead of actual loop - not *required* functional codestyle
+    "SIM110", "SIM111",
+    # dictionary lookup for 3+ if's
+    "SIM116",
+    # allow prints in CLI tools
+    "T201",
+]
+per-file-ignores = [
+    # unused imports
+    "*/__init__.py:F401",
+]
+
+[tool.mypy]
+exclude = ["venv"]
+disable_error_code = "attr-defined"
+ignore_missing_imports = true
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+warn_return_any = true
+warn_unreachable = true
+
+[tool.isort]
+line_length = 100
+include_trailing_comma = true
+combine_as_imports = true
+use_parentheses = true
